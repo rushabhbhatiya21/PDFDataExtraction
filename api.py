@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List
 from openai import OpenAI
@@ -6,8 +7,25 @@ import os, json
 from enum import Enum
 from decouple import config
 from pdf_utils import get_cords_of_word, extract_invoice_data_pdf
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from pathlib import Path
+
+
+STATIC_DIR = Path("static")
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 class DataType(Enum):
     IMAGEURL = "imageurl",
@@ -106,6 +124,18 @@ def extract_invoice_data(data_type: DataType, text):
 
     return response.choices[0].message.content
 
+
+@app.post("/upload/")
+async def upload_file(document: UploadFile = File(...)):
+    try:
+        file_location = STATIC_DIR / document.filename
+        with open(file_location, "wb") as f:
+            f.write(document.file.read())
+        return JSONResponse(content={"message": "File uploaded successfully", "filename": document.filename}, status_code=200)
+    except Exception as e:
+        return JSONResponse(content={"message": "File upload failed", "error": str(e)}, status_code=500)
+
+
 @app.post("/getInvoiceData/image")
 async def get_invoice_data(image_urls: ImageUrls) -> dict:
     """
@@ -171,3 +201,4 @@ def hello():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=5500)
+

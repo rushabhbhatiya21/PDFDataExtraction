@@ -1,3 +1,6 @@
 .env
 Lib
 Include
+pyvenv.cfg
+Scripts
+static
